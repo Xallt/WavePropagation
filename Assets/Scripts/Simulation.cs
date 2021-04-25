@@ -10,23 +10,59 @@ public class PingEvent : UnityEvent<int>
 {
 }
 
-public class Simulation : MonoBehaviour
+public interface Propagator
 {
-    public enum GeodesicAlgorithmType
+    IEnumerable<(float, int)> Propagate(int vertex);
+}
+
+public class DecayingWavePropagator : Propagator
+{
+    private Mesh _mesh;
+    private HashSet<int>[] _adjacencyMap;
+    private double[,] distance;
+    private float waveSpeed;
+    private void ComputeDistances()
     {
-        DijkstraAlgorithm,
-        ExactAlgorithm
+        double[] vertices = new double[_mesh.vertexCount * 3];
+        for (int i = 0; i < _mesh.vertexCount; ++i)
+        {
+            vertices[3 * i] = _mesh.vertices[i].x;
+            vertices[3 * i + 1] = _mesh.vertices[i].y;
+            vertices[3 * i + 2] = _mesh.vertices[i].z;
+        }
+        uint[] faces = _mesh.triangles.Select(x => (uint)x).ToArray();
+        double[,] matrix = GeodesicAlgorithmIntegration.geodesicExactComputeMatrix(vertices, faces);
+        distance = matrix;
     }
-    public GeodesicAlgorithmType algorithm;
+    public DecayingWavePropagator(Mesh mesh, float waveSpeed)
+    {
+        _mesh = mesh;
+        _adjacencyMap = WavePropagation.Utils.AdjacencyMap(mesh);
+        this.waveSpeed = waveSpeed;
+        ComputeDistances();
+    }
+    IEnumerable<(float, int)> Propagator.Propagate(int vertex)
+    {
+        foreach (var otherVertex in _adjacencyMap[vertex])
+        {
+            yield return (
+                (float)distance[vertex, otherVertex] / waveSpeed,
+                otherVertex
+           );
+        }
+    }
+}
+
+public class Simulation: MonoBehaviour
+{
     public double speed;
     public GameObject polyhedraGameObject;
     public uint maxPings;
     private Polyhedra polyhedra;
     private Mesh polyhedraMesh;
-    private Geodesic.Mesh geodesicCompressedMesh;
     private SortedSet<Tuple<double, int>> pings;
-    private Dictionary<Tuple<int, int>, double> distance;
     private Queue<int> pingQueue;
+    private Propagator propagator;
 
     public PingEvent pingEvent;
     public UnityEvent onSimulationEnded;
@@ -38,78 +74,26 @@ public class Simulation : MonoBehaviour
     {
         polyhedra.onMeshSet.AddListener(InitSimulationParameters);
     }
+    public void SetPropagator(Propagator propagator)
+    {
+        this.propagator = propagator;
+    }
     public void InitSimulationParameters()
     {
         polyhedraMesh = polyhedra.GetCompressedMesh();
-        geodesicCompressedMesh = new Geodesic.Mesh(
-            polyhedraMesh.vertices.Select(v => new Geodesic.Vertex(null, new Geodesic.Vec3(v.x, v.y, v.z))).ToArray(),
-            Enumerable.Range(0, polyhedraMesh.triangles.Length / 3).Select(ind => new Geodesic.Face(
-                null,
-                polyhedraMesh.triangles[ind * 3],
-                polyhedraMesh.triangles[ind * 3 + 1],
-                polyhedraMesh.triangles[ind * 3 + 2]
-            )).ToArray()
-        );
         pings = new SortedSet<Tuple<double, int>>();
         pingQueue = new Queue<int>();
     }
 
-    private void ComputeDistances()
+    public void StartSimulation(int startingVertex)
     {
-        distance = new Dictionary<Tuple<int, int>, double>();
-        if (algorithm == GeodesicAlgorithmType.DijkstraAlgorithm)
-        {
-            var geodesicAlgorithm = new Geodesic.DijkstraAlgorithm(geodesicCompressedMesh);
-            for (int i = 0; i < geodesicCompressedMesh.vertices.Length; ++i)
-            {
-                geodesicAlgorithm.Propagate(Enumerable.Repeat(1, 1));
-                for (int j = 0; j < geodesicCompressedMesh.vertices.Length; ++j)
-                {
-                    distance[Tuple.Create(i, j)] = geodesicAlgorithm.DistanceTo(j);
-                }
-            }
-        } else if (algorithm == GeodesicAlgorithmType.ExactAlgorithm)
-        {
-            double[] vertices = new double[polyhedraMesh.vertexCount * 3];
-            for (int i = 0; i < polyhedraMesh.vertexCount; ++i)
-            {
-                vertices[3 * i] = polyhedraMesh.vertices[i].x;
-                vertices[3 * i + 1] = polyhedraMesh.vertices[i].y;
-                vertices[3 * i + 2] = polyhedraMesh.vertices[i].z;
-            }
-            uint[] faces = polyhedraMesh.triangles.Select(x => (uint)x).ToArray();
-            double[,] matrix = GeodesicAlgorithmIntegration.geodesicExactComputeMatrix(vertices, faces);
-            for (int i = 0; i < polyhedraMesh.vertexCount; ++i)
-            {
-                for (int t = 0; t < polyhedraMesh.vertexCount; ++t)
-                    distance[Tuple.Create(i, t)] = matrix[i, t];
-            }
-        }
-        
-    }
-
-    public void StartSimulation(bool onlinePinging = false)
-    {
-        ComputeDistances();
-        if (!onlinePinging)
-        {
-            double curTime = Time.time;
-            foreach (int pingedVertex in pingQueue)
-                pings.Add(Tuple.Create(curTime, pingedVertex));
-            StartCoroutine("PingSimulationCoroutine");
-        }
-            
-        else
-            throw new NotImplementedException();
+        pings.Add(Tuple.Create((double)Time.time, startingVertex));
+        StartCoroutine("PingSimulationCoroutine");
     }
 
     public void EnqueuePing(int vertex)
     {
         pingQueue.Enqueue(vertex);
-    }
-    private double Distance(int a, int b)
-    {
-        return distance[Tuple.Create(a, b)];
     }
     private void EndSimulation()
     {
@@ -136,11 +120,10 @@ public class Simulation : MonoBehaviour
             else
                 break;
             pingEvent.Invoke(currentPingedVertex);
-            var adjacentHalfEdges = polyhedra.GetAdjacentVertices(currentPingedVertex).ToArray();
-            foreach (var otherVertex in adjacentHalfEdges)
+            foreach (var (time, otherVertex) in propagator.Propagate(currentPingedVertex))
             {
                 pings.Add(Tuple.Create(
-                    pingTime + Distance(currentPingedVertex, otherVertex) / speed, 
+                    pingTime + time, 
                     otherVertex
                ));
             }

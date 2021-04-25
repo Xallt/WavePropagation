@@ -43,18 +43,7 @@ public class Polyhedra : MonoBehaviour
     }
     private void InitAdjacency()
     {
-        vertexToAdjacent = Enumerable.Range(0, compressedMesh.vertexCount).Select(_ => new HashSet<int>()).ToArray();
-        for (int i = 0; i < compressedMesh.triangles.Length / 3; i++)
-        {
-            for (int j = i * 3; j < i * 3 + 3; ++j)
-            {
-                for (int k = j + 1; k < i * 3 + 3; ++k)
-                {
-                    vertexToAdjacent[compressedMesh.triangles[j]].Add(compressedMesh.triangles[k]);
-                    vertexToAdjacent[compressedMesh.triangles[k]].Add(compressedMesh.triangles[j]);
-                }
-            }
-        }
+        vertexToAdjacent = Utils.AdjacencyMap(compressedMesh);
     }
     public Mesh GetCompressedMesh()
     {

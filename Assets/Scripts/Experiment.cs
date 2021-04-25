@@ -5,17 +5,20 @@ using UnityEngine;
 public class Experiment : MonoBehaviour
 {
     public Polyhedra polyhedra;
+    private Simulation sim;
+    public void Awake()
+    {
+        sim = GetComponent<Simulation>();
+    }
     // Start is called before the first frame update
+    private void Start()
+    {
+        sim.pingEvent.AddListener(polyhedra.GetComponent<VertexHighlighter>().HighlightVertex);
+    }
 
     public void StartExperiment()
     {
-        var sim = GetComponent<Simulation>();
-        sim.EnqueuePing(0);
-        sim.StartSimulation();
-    }
-
-    public void Action()
-    {
-
+        sim.SetPropagator(new DecayingWavePropagator(polyhedra.GetCompressedMesh(), (float)sim.speed));
+        sim.StartSimulation(0);
     }
 }

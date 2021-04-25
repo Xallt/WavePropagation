@@ -1,6 +1,8 @@
 ﻿using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
 namespace WavePropagation
 {
@@ -55,6 +57,22 @@ namespace WavePropagation
         {
             var (min, max) = BoundingBox(mesh);
             return (min + max) / 2;
+        }
+        public static HashSet<int>[] AdjacencyMap(Mesh mesh)
+        {
+            HashSet<int>[] vertexToAdjacent = Enumerable.Range(0, mesh.vertexCount).Select(_ => new HashSet<int>()).ToArray();
+            for (int i = 0; i < mesh.triangles.Length / 3; i++)
+            {
+                for (int j = i * 3; j < i * 3 + 3; ++j)
+                {
+                    for (int k = j + 1; k < i * 3 + 3; ++k)
+                    {
+                        vertexToAdjacent[mesh.triangles[j]].Add(mesh.triangles[k]);
+                        vertexToAdjacent[mesh.triangles[k]].Add(mesh.triangles[j]);
+                    }
+                }
+            }
+            return vertexToAdjacent;
         }
     }
     
