@@ -29,11 +29,19 @@ public class Polyhedra : MonoBehaviour
         compressedMesh = Utils.CompressMesh(mesh);
         InitAdjacency();
     }
+    private void UpdateCollider()
+    {
+        Collider collider = GetComponent<Collider>();
+        if (collider)
+            Destroy(collider);
+        gameObject.AddComponent(typeof(SphereCollider));
+    }
     public void SetMesh(Mesh mesh)
     {
         GetComponent<MeshFilter>().mesh = mesh;
         SetLocalTransform();
         UpdateCompressedMesh();
+        UpdateCollider();
         onMeshSet.Invoke();
     }
 

@@ -30,14 +30,14 @@ public class VertexHighlighter : MonoBehaviour
         }
         vertexHighlightSpheres.Clear();
         polyhedraCompressedMesh = polyhedra.GetCompressedMesh();
-        float compressedMeshSize = WavePropagation.Utils.MaxDimension(polyhedraCompressedMesh);
+        float compressedMeshSize = WavePropagation.Utils.MaxDimension(polyhedra.GetMesh());
 
         initialSphereScale = compressedMeshSize * relativeInitialScale;
-        
+
         for (int i = 0; i < polyhedraCompressedMesh.vertices.Length; ++i)
         {
             GameObject sphere = Instantiate(hightlightSpherePrefab);
-            sphere.transform.SetParent(transform.parent);
+            sphere.transform.SetParent(transform);
             sphere.transform.position = polyhedraCompressedMesh.vertices[i];
             sphere.transform.localScale = new Vector3(0, 0, 0);
             vertexHighlightSpheres.Add(i, sphere);
