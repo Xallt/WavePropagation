@@ -5,6 +5,11 @@ using UnityEngine.UI;
 
 public class WaveTypeMenuController : MonoBehaviour
 {
+    private Simulation sim;
+    private void Awake()
+    {
+        sim = GameObject.Find("App").GetComponent<Simulation>();
+    }
     private void OnPingCounterIncrement(int vertex)
     {
         GetComponentInChildren<Counter>().Increment();
@@ -14,10 +19,10 @@ public class WaveTypeMenuController : MonoBehaviour
         Mesh polyMeshToSet = GetComponentInChildren<MeshSelector>().GetSelectedMesh();
         GameObject.Find("Polyhedra").GetComponent<Polyhedra>().SetMesh(polyMeshToSet);
 
-        GameObject.Find("App").GetComponent<Simulation>().pingEvent.AddListener(OnPingCounterIncrement);
+        sim.pingEvent.AddListener(OnPingCounterIncrement);
     }
     private void OnDisable()
     {
-        GameObject.Find("App").GetComponent<Simulation>().pingEvent.RemoveListener(OnPingCounterIncrement);
+        sim.pingEvent.RemoveListener(OnPingCounterIncrement);
     }
 }

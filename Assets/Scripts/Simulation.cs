@@ -4,18 +4,19 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEditor.Media;
 
 [System.Serializable]
 public class PingEvent : UnityEvent<int>
 {
 }
 
-public interface Propagator
+public interface IPropagator
 {
     IEnumerable<(float, int)> Propagate(int vertex);
 }
 
-public class DecayingWavePropagator : Propagator
+public class DecayingWavePropagator : IPropagator
 {
     private Mesh _mesh;
     private HashSet<int>[] _adjacencyMap;
@@ -41,7 +42,7 @@ public class DecayingWavePropagator : Propagator
         this.waveSpeed = waveSpeed;
         ComputeDistances();
     }
-    IEnumerable<(float, int)> Propagator.Propagate(int vertex)
+    public IEnumerable<(float, int)> Propagate(int vertex)
     {
         foreach (var otherVertex in _adjacencyMap[vertex])
         {
@@ -53,16 +54,68 @@ public class DecayingWavePropagator : Propagator
     }
 }
 
+public class ClassicWaveTetrahedronPropagator : IPropagator
+{
+    private float tetrahedronSide, waveSpeed, waveTimeToLive;
+    private List<float> pingTimes;
+    private void InitPingTimes()
+    {
+        pingTimes = new List<float>();
+        HashSet<MediaRational> fracs = new HashSet<MediaRational>();
+        float maxAllowedDistance = waveTimeToLive * waveTimeToLive;
+
+        for (int level = 0; ; ++level)
+        {
+            for (int i = 0; i <= level; ++i)
+            {
+                int j = level - i;
+                int ys3 = i, x = 1 - i % 2 + j; // ys3 is y / sqrt(3)
+                float yf = ys3 * (float)Math.Sqrt(3), xf = (float)x;
+                float distance2 = yf * yf + xf * xf;
+                if (distance2 > maxAllowedDistance)
+                {
+                    continue;
+                }
+                MediaRational rel = new MediaRational(x, ys3);
+                if (fracs.Contains(rel))
+                {
+                    continue;
+                }
+                fracs.Add(rel);
+                pingTimes.Add(Mathf.Sqrt(distance2) / waveSpeed);
+            }
+            if (level > maxAllowedDistance)
+                break;
+        }
+        Debug.Log(string.Join(" , ", pingTimes.Select(x => x.ToString())));
+    }
+    public ClassicWaveTetrahedronPropagator(float tetrahedronSide, float waveSpeed, float waveTimeToLive)
+    {
+        this.tetrahedronSide = tetrahedronSide;
+        this.waveSpeed = waveSpeed;
+        this.waveTimeToLive = waveTimeToLive;
+        InitPingTimes();
+    }
+    public IEnumerable<(float, int)> Propagate(int vertex)
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            if (i == vertex)
+                continue;
+            foreach (float f in pingTimes)
+                yield return (f, i);
+        }
+    }
+}
 public class Simulation: MonoBehaviour
 {
     public double speed;
     public GameObject polyhedraGameObject;
     public uint maxPings;
     private Polyhedra polyhedra;
-    private Mesh polyhedraMesh;
     private SortedSet<Tuple<double, int>> pings;
     private Queue<int> pingQueue;
-    private Propagator propagator;
+    private IPropagator propagator;
 
     public PingEvent pingEvent;
     public UnityEvent onSimulationEnded;
@@ -74,13 +127,12 @@ public class Simulation: MonoBehaviour
     {
         polyhedra.onMeshSet.AddListener(InitSimulationParameters);
     }
-    public void SetPropagator(Propagator propagator)
+    public void SetPropagator(IPropagator propagator)
     {
         this.propagator = propagator;
     }
     public void InitSimulationParameters()
     {
-        polyhedraMesh = polyhedra.GetCompressedMesh();
         pings = new SortedSet<Tuple<double, int>>();
         pingQueue = new Queue<int>();
     }
@@ -103,11 +155,6 @@ public class Simulation: MonoBehaviour
     {
         while (true)
         {
-            if (pings.Count > maxPings)
-            {
-                EndSimulation();
-                break;
-            }
             int currentPingedVertex = -1;
             double pingTime = -1;
             if (pings.Count > 0)
