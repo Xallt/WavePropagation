@@ -87,7 +87,6 @@ public class ClassicWaveTetrahedronPropagator : IPropagator
             if (level > maxAllowedDistance)
                 break;
         }
-        Debug.Log(string.Join(" , ", pingTimes.Select(x => x.ToString())));
     }
     public ClassicWaveTetrahedronPropagator(float tetrahedronSide, float waveSpeed, float waveTimeToLive)
     {
@@ -107,49 +106,43 @@ public class ClassicWaveTetrahedronPropagator : IPropagator
         }
     }
 }
-public class Simulation: MonoBehaviour
+
+public abstract class Simulation
 {
-    public double speed;
-    public GameObject polyhedraGameObject;
-    public uint maxPings;
-    private Polyhedra polyhedra;
+    public PingEvent onPing;
+    public float speed, time;
+    public Simulation(float speed, float time)
+    {
+        onPing = new PingEvent();
+        this.speed = speed;
+        this.time = time;
+    }
+    public abstract IEnumerator StartSimulation();
+}
+
+
+public class MultiplePingSimulation: Simulation
+{
     private SortedSet<Tuple<double, int>> pings;
     private Queue<int> pingQueue;
+    private int startVertex;
     private IPropagator propagator;
-
-    public PingEvent pingEvent;
-    public UnityEvent onSimulationEnded;
-    private void Awake()
-    {
-        polyhedra = polyhedraGameObject.GetComponent<Polyhedra>();
-    }
-    public void OnEnable()
-    {
-        polyhedra.onMeshSet.AddListener(InitSimulationParameters);
-    }
-    public void SetPropagator(IPropagator propagator)
+    public MultiplePingSimulation(float speed, float time, Mesh polyhedraMesh, IPropagator propagator, int startVertex = 0): base(speed, time)
     {
         this.propagator = propagator;
-    }
-    public void InitSimulationParameters()
-    {
-        pings = new SortedSet<Tuple<double, int>>();
+        this.startVertex = startVertex;
         pingQueue = new Queue<int>();
+        pings = new SortedSet<Tuple<double, int>>();
     }
 
-    public void StartSimulation(int startingVertex)
+    public override IEnumerator StartSimulation()
     {
-        pings.Add(Tuple.Create((double)Time.time, startingVertex));
-        StartCoroutine("PingSimulationCoroutine");
-    }
+        pings.Clear();
+        pingQueue.Clear();
 
-    public void EnqueuePing(int vertex)
-    {
-        pingQueue.Enqueue(vertex);
-    }
-    private void EndSimulation()
-    {
-        onSimulationEnded.Invoke();
+        pings.Add(Tuple.Create((double)Time.time, startVertex));
+
+        return PingSimulationCoroutine();
     }
     private IEnumerator PingSimulationCoroutine()
     {
@@ -166,11 +159,74 @@ public class Simulation: MonoBehaviour
             }
             else
                 break;
-            pingEvent.Invoke(currentPingedVertex);
+            onPing.Invoke(currentPingedVertex);
             foreach (var (time, otherVertex) in propagator.Propagate(currentPingedVertex))
             {
                 pings.Add(Tuple.Create(
                     pingTime + time, 
+                    otherVertex
+               ));
+            }
+        }
+    }
+}
+
+public class SinglePingSimulation : Simulation
+{
+    private SortedSet<Tuple<double, int>> pings;
+    private Queue<int> pingQueue;
+    private int startVertex;
+    private IPropagator propagator;
+    private float eps;
+    public SinglePingSimulation(float speed, float time, Mesh polyhedraMesh, IPropagator propagator, float eps = 0, int startVertex = 0) : base(speed, time)
+    {
+        this.propagator = propagator;
+        this.startVertex = startVertex;
+        this.eps = eps;
+        pingQueue = new Queue<int>();
+        pings = new SortedSet<Tuple<double, int>>();
+    }
+
+    public override IEnumerator StartSimulation()
+    {
+        pings.Clear();
+        pingQueue.Clear();
+
+        pings.Add(Tuple.Create((double)Time.time, startVertex));
+
+        return PingSimulationCoroutine();
+    }
+    private IEnumerator PingSimulationCoroutine()
+    {
+        while (true)
+        {
+            int currentPingedVertex = -1;
+            double pingTime = -1;
+            if (pings.Count > 0)
+            {
+                if (pings.Min.Item1 > Time.time)
+                    yield return new WaitForSeconds((float)pings.Min.Item1 - Time.time);
+                (pingTime, currentPingedVertex) = pings.Min;
+                List<Tuple<double, int>> toDelete = new List<Tuple<double, int>>();
+                foreach (var p in pings)
+                {
+                    if (p.Item1 > pingTime + eps)
+                        break;
+                    if (p.Item2 == currentPingedVertex)
+                        toDelete.Add(p);
+                }
+                foreach (var p in toDelete)
+                    pings.Remove(p);
+                while (pings.Count > 0 && pings.Min.Item1 == pingTime)
+                pings.Remove(pings.Min);
+            }
+            else
+                break;
+            onPing.Invoke(currentPingedVertex);
+            foreach (var (time, otherVertex) in propagator.Propagate(currentPingedVertex))
+            {
+                pings.Add(Tuple.Create(
+                    pingTime + time,
                     otherVertex
                ));
             }

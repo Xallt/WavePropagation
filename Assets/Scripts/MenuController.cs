@@ -6,6 +6,7 @@ using SubjectNerd.Utilities;
 
 public class MenuController : MonoBehaviour
 {
+    private Dropdown waveTypeSelector;
     [Serializable]
     public class WaveTypeMenuWithName
     {
@@ -16,11 +17,7 @@ public class MenuController : MonoBehaviour
     public WaveTypeMenuWithName[] waveTypeMenus;
     private void Start()
     {
-        InitWaveTypeSelector();
-    }
-    private void InitWaveTypeSelector()
-    {
-        Dropdown waveTypeSelector = GameObject.Find("WaveTypeSelector").GetComponent<Dropdown>();
+        waveTypeSelector = GameObject.Find("WaveTypeSelector").GetComponent<Dropdown>();
         waveTypeSelector.AddOptions(waveTypeMenus.Select(x => x.name).ToList());
         waveTypeSelector.onValueChanged.AddListener(SwitchToWaveTypeMenu);
         SwitchToWaveTypeMenu(waveTypeSelector.value);
@@ -32,5 +29,9 @@ public class MenuController : MonoBehaviour
             obj.waveTypeMenu.SetActive(false);
         }
         waveTypeMenus[index].waveTypeMenu.SetActive(true);
+    }
+    public WaveTypeMenuController ActiveMenu()
+    {
+        return waveTypeMenus[waveTypeSelector.value].waveTypeMenu.GetComponent<WaveTypeMenuController>();
     }
 }

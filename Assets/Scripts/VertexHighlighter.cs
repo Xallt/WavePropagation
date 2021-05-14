@@ -9,6 +9,7 @@ public class VertexHighlighter : MonoBehaviour
     public float fadeOutDuration = 1.0f;
     public float relativeInitialScale;
     private Polyhedra polyhedra;
+    private SimulationController simulationController;
     private Mesh polyhedraCompressedMesh;
     private Dictionary<int, GameObject> vertexHighlightSpheres;
     private float scaleDeclineSpeed;
@@ -17,6 +18,7 @@ public class VertexHighlighter : MonoBehaviour
     {
         polyhedra = GetComponent<Polyhedra>();
         vertexHighlightSpheres = new Dictionary<int, GameObject>();
+        simulationController = GameObject.Find("App").GetComponent<SimulationController>();
     }
     private void OnEnable()
     {
