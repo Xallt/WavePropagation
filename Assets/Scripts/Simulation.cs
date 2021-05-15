@@ -127,6 +127,7 @@ public class MultiplePingSimulation: Simulation
     private Queue<int> pingQueue;
     private int startVertex;
     private IPropagator propagator;
+    private float finishTime;
     public MultiplePingSimulation(float speed, float time, Mesh polyhedraMesh, IPropagator propagator, int startVertex = 0): base(speed, time)
     {
         this.propagator = propagator;
@@ -141,6 +142,7 @@ public class MultiplePingSimulation: Simulation
         pingQueue.Clear();
 
         pings.Add(Tuple.Create((double)Time.time, startVertex));
+        finishTime = Time.time + time;
 
         return PingSimulationCoroutine();
     }
@@ -148,6 +150,8 @@ public class MultiplePingSimulation: Simulation
     {
         while (true)
         {
+            if (Time.time > finishTime)
+                break;
             int currentPingedVertex = -1;
             double pingTime = -1;
             if (pings.Count > 0)
@@ -178,6 +182,7 @@ public class SinglePingSimulation : Simulation
     private int startVertex;
     private IPropagator propagator;
     private float eps;
+    private float finishTime;
     public SinglePingSimulation(float speed, float time, Mesh polyhedraMesh, IPropagator propagator, float eps = 0, int startVertex = 0) : base(speed, time)
     {
         this.propagator = propagator;
@@ -193,6 +198,7 @@ public class SinglePingSimulation : Simulation
         pingQueue.Clear();
 
         pings.Add(Tuple.Create((double)Time.time, startVertex));
+        finishTime = Time.time + time;
 
         return PingSimulationCoroutine();
     }
@@ -200,8 +206,11 @@ public class SinglePingSimulation : Simulation
     {
         while (true)
         {
+            if (Time.time > finishTime)
+                break;
             int currentPingedVertex = -1;
             double pingTime = -1;
+            
             if (pings.Count > 0)
             {
                 if (pings.Min.Item1 > Time.time)
@@ -217,18 +226,17 @@ public class SinglePingSimulation : Simulation
                 }
                 foreach (var p in toDelete)
                     pings.Remove(p);
-                while (pings.Count > 0 && pings.Min.Item1 == pingTime)
-                pings.Remove(pings.Min);
             }
             else
                 break;
             onPing.Invoke(currentPingedVertex);
             foreach (var (time, otherVertex) in propagator.Propagate(currentPingedVertex))
             {
-                pings.Add(Tuple.Create(
-                    pingTime + time,
-                    otherVertex
-               ));
+                if (pingTime + time <= finishTime)
+                    pings.Add(Tuple.Create(
+                        pingTime + time,
+                        otherVertex
+                   ));
             }
         }
     }
