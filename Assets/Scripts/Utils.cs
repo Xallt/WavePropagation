@@ -1,8 +1,10 @@
 ﻿using System.Collections;
 using System;
+using System.Security.Cryptography;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using System.Text;
 
 namespace WavePropagation
 {
@@ -73,6 +75,22 @@ namespace WavePropagation
                 }
             }
             return vertexToAdjacent;
+        }
+        public static byte[] GetHash(string inputString)
+        {
+            using (HashAlgorithm algorithm = SHA256.Create())
+                return algorithm.ComputeHash(Encoding.UTF8.GetBytes(inputString));
+        }
+
+        public static string GetHashString(string inputString, int length = 64)
+        {
+            if (length > 64)
+                throw new ArgumentOutOfRangeException(String.Format("SHA-256 itself is 64 characters. So it can not be truncated to {0} characters", length));
+            StringBuilder sb = new StringBuilder();
+            foreach (byte b in GetHash(inputString))
+                sb.Append(b.ToString("X2"));
+
+            return sb.ToString().Substring(0, length);
         }
     }
     

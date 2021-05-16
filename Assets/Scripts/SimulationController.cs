@@ -37,6 +37,7 @@ public class SimulationController : MonoBehaviour
     }
     private IEnumerator CurrentSimulationCoroutine()
     {
+        onSimulationStarted.Invoke();
         yield return sim.StartSimulation();
         onSimulationEnded.Invoke();
     }
@@ -70,6 +71,5 @@ public class SimulationController : MonoBehaviour
         );
         PrepareSimulation();
         StartCoroutine("CurrentSimulationCoroutine");
-        onSimulationStarted.Invoke();
     }
 }
