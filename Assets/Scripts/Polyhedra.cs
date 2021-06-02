@@ -43,6 +43,7 @@ public class Polyhedra : MonoBehaviour
         UpdateCompressedMesh();
         UpdateCollider();
         onMeshSet.Invoke();
+        Debug.Log((compressedMesh.vertices[1] - compressedMesh.vertices[0]).magnitude);
     }
 
     private void Start()

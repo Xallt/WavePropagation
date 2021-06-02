@@ -21,7 +21,7 @@ public class SimulationController : MonoBehaviour
     }
     private void OnEnable()
     {
-        onSimulationPing.AddListener(polyhedra.GetComponent<VertexHighlighter>().HighlightVertex);
+        onSimulationPing.AddListener((x, t) => polyhedra.GetComponent<VertexHighlighter>().HighlightVertex(x));
     }
     public void SetSpeed(float speed)
     {

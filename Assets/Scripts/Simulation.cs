@@ -7,7 +7,7 @@ using UnityEngine.Events;
 using UnityEditor.Media;
 
 [System.Serializable]
-public class PingEvent : UnityEvent<int>
+public class PingEvent : UnityEvent<int, float>
 {
 }
 
@@ -150,12 +150,12 @@ public class MultiplePingSimulation: Simulation
     {
         while (true)
         {
-            if (Time.time > finishTime)
-                break;
             int currentPingedVertex = -1;
             double pingTime = -1;
             if (pings.Count > 0)
             {
+                if (pings.Min.Item1 > finishTime)
+                    break;
                 if (pings.Min.Item1 > Time.time)
                     yield return new WaitForSeconds((float)pings.Min.Item1 - Time.time);
                 (pingTime, currentPingedVertex) = pings.Min;
@@ -163,7 +163,7 @@ public class MultiplePingSimulation: Simulation
             }
             else
                 break;
-            onPing.Invoke(currentPingedVertex);
+            onPing.Invoke(currentPingedVertex, (float)pingTime);
             foreach (var (time, otherVertex) in propagator.Propagate(currentPingedVertex))
             {
                 pings.Add(Tuple.Create(
@@ -206,13 +206,13 @@ public class SinglePingSimulation : Simulation
     {
         while (true)
         {
-            if (Time.time > finishTime)
-                break;
             int currentPingedVertex = -1;
             double pingTime = -1;
             
             if (pings.Count > 0)
             {
+                if (pings.Min.Item1 > finishTime)
+                    break;
                 if (pings.Min.Item1 > Time.time)
                     yield return new WaitForSeconds((float)pings.Min.Item1 - Time.time);
                 (pingTime, currentPingedVertex) = pings.Min;
@@ -229,7 +229,7 @@ public class SinglePingSimulation : Simulation
             }
             else
                 break;
-            onPing.Invoke(currentPingedVertex);
+            onPing.Invoke(currentPingedVertex, (float)pingTime);
             foreach (var (time, otherVertex) in propagator.Propagate(currentPingedVertex))
             {
                 if (pingTime + time <= finishTime)

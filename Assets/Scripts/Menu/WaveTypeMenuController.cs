@@ -13,7 +13,7 @@ public class WaveTypeMenuController : MonoBehaviour
     {
         return GetComponentInChildren<Counter>();
     }
-    private void CounterIncrement(int vertex)
+    private void CounterIncrement(int vertex, float time)
     {
         Counter().Increment();
     }
